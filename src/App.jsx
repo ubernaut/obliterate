@@ -174,7 +174,7 @@ function App() {
       const targets = [];
       const targetMaterial = new THREE.MeshPhongMaterial({ color: 0xff0000 });
 
-      for (let i = 0; i < 12; i++) {
+      for (let i = 0; i < 6; i++) {
         // Distribute targets using spherical coordinates for better coverage
         const theta = Math.random() * Math.PI * 2; // Horizontal angle
         const phi = Math.acos(2 * Math.random() - 1); // Vertical angle (uniform distribution)
@@ -200,8 +200,24 @@ function App() {
     const targets = createTargets();
     targetsRef.current = targets;
 
-    // Expose createTargets for reset
+    // Function to reset planet geometry
+    const resetPlanet = () => {
+      const positions = planetGeometry.attributes.position;
+      for (let i = 0; i < positions.count; i++) {
+        positions.setXYZ(
+          i,
+          originalPositions[i * 3],
+          originalPositions[i * 3 + 1],
+          originalPositions[i * 3 + 2]
+        );
+      }
+      positions.needsUpdate = true;
+      planetGeometry.computeVertexNormals();
+    };
+
+    // Expose createTargets and resetPlanet for reset
     mountRef.current.createTargets = createTargets;
+    mountRef.current.resetPlanet = resetPlanet;
 
     // Projectile
     let projectile = null;
@@ -660,7 +676,10 @@ function App() {
   }, []);
 
   const handlePlayAgain = () => {
-    if (mountRef.current && mountRef.current.createTargets) {
+    if (mountRef.current && mountRef.current.createTargets && mountRef.current.resetPlanet) {
+      // Reset planet surface to original state
+      mountRef.current.resetPlanet();
+      
       // Remove old targets
       targetsRef.current.forEach(target => {
         const scene = mountRef.current.children[0]; // Access scene from renderer
