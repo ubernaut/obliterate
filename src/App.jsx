@@ -12,8 +12,15 @@ function App() {
   const [velocity, setVelocity] = useState(50);
   const [angle, setAngle] = useState(45);
   const [heading, setHeading] = useState(0);
-  const [score, setScore] = useState(0);
+  const [kills, setKills] = useState(0);
+  const [shots, setShots] = useState(0);
+  const [startTime] = useState(Date.now());
+  const [victory, setVictory] = useState(false);
   const keysRef = useRef({ w: false, a: false, s: false, d: false });
+  const [joystickPos, setJoystickPos] = useState({ x: 0, y: 0 });
+  const [joystickActive, setJoystickActive] = useState(false);
+  const targetsRef = useRef([]);
+  const joystickRef = useRef(null);
 
   useEffect(() => {
     const currentMount = mountRef.current;
@@ -56,12 +63,12 @@ function App() {
 
     // Planet with modifiable geometry
     //    const planetGeometry = new THREE.SphereGeometry(20, 32, 32);
-    const planetGeometry = new THREE.IcosahedronGeometry(20, 6);
+    const planetGeometry = new THREE.IcosahedronGeometry(20, 9);
     const planetMaterial = new THREE.MeshPhongMaterial({
-      color: 0x222222,
+      color: 0x000000,
       flatShading: true,
-      //roughness: 0.8,
-      //metalness: 0.2
+      roughness: 0,
+      metalness: 1
     });
     const edgesGeometry = new THREE.EdgesGeometry(planetGeometry);
     const lineMaterial = new THREE.LineBasicMaterial({ color: 0x330000 }); // Red color for edges
@@ -102,29 +109,98 @@ function App() {
     player.position.set(0, 0, 21);
     scene.add(player);
 
-    // Create targets around the planet (red cylinders)
-    const targets = [];
-    const targetMaterial = new THREE.MeshPhongMaterial({ color: 0xff0000 });
-
-    for (let i = 0; i < 12; i++) {
-      // Distribute targets using spherical coordinates for better coverage
-      const theta = Math.random() * Math.PI * 2; // Horizontal angle
-      const phi = Math.acos(2 * Math.random() - 1); // Vertical angle (uniform distribution)
-
-      const targetGeometry = new THREE.IcosahedronGeometry(1);
-      const target = new THREE.Mesh(targetGeometry, targetMaterial);
-
-      const targetPos = new THREE.Vector3(
-        21 * Math.sin(phi) * Math.cos(theta),
-        21 * Math.cos(phi),
-        21 * Math.sin(phi) * Math.sin(theta),
+    // Launch direction indicator (3-sided cylinder) - attached to player
+    const indicatorGeometry = new THREE.CylinderGeometry(0.2, 0.2, 3, 3);
+    const indicatorMaterial = new THREE.MeshPhongMaterial({ color: 0xffff00 });
+    const indicator = new THREE.Mesh(indicatorGeometry, indicatorMaterial);
+    player.add(indicator); // Make indicator a child of player
+    
+    // Function to update indicator position and orientation
+    const updateIndicator = (ang, head) => {
+      const angleRad = (ang * Math.PI) / 180;
+      const headingRad = (head * Math.PI) / 180;
+      
+      // Calculate direction in world space (same as projectile)
+      const playerNormal = player.position.clone().normalize();
+      
+      // Use a reference vector that won't be parallel to the normal
+      let refVector = new THREE.Vector3(0, 1, 0);
+      if (Math.abs(playerNormal.dot(refVector)) > 0.9) {
+        refVector = new THREE.Vector3(1, 0, 0);
+      }
+      
+      const tangent = new THREE.Vector3()
+        .crossVectors(refVector, playerNormal)
+        .normalize();
+      const bitangent = new THREE.Vector3()
+        .crossVectors(playerNormal, tangent)
+        .normalize();
+      
+      const worldDirection = new THREE.Vector3();
+      worldDirection.add(playerNormal.clone().multiplyScalar(Math.sin(angleRad)));
+      worldDirection.add(
+        tangent
+          .clone()
+          .multiplyScalar(Math.cos(angleRad) * Math.sin(headingRad))
       );
+      worldDirection.add(
+        bitangent
+          .clone()
+          .multiplyScalar(Math.cos(angleRad) * Math.cos(headingRad))
+      );
+      worldDirection.normalize();
+      
+      // Convert world direction to player's local space
+      const localDirection = player.worldToLocal(
+        player.position.clone().add(worldDirection)
+      ).normalize();
+      
+      // Position indicator in local space (offset from player center)
+      indicator.position.copy(localDirection.clone().multiplyScalar(2));
+      
+      // Orient indicator to point in the local direction
+      indicator.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), localDirection);
+    };
+    
+    // Expose updateIndicator for slider changes
+    mountRef.current.updateIndicator = updateIndicator;
+    
+    // Initial indicator update
+    updateIndicator(45, 0);
 
-      target.position.copy(targetPos);
-      target.lookAt(targetPos.clone().multiplyScalar(2)); // Orient away from planet
-      scene.add(target);
-      targets.push(target);
-    }
+    // Function to create targets
+    const createTargets = () => {
+      const targets = [];
+      const targetMaterial = new THREE.MeshPhongMaterial({ color: 0xff0000 });
+
+      for (let i = 0; i < 12; i++) {
+        // Distribute targets using spherical coordinates for better coverage
+        const theta = Math.random() * Math.PI * 2; // Horizontal angle
+        const phi = Math.acos(2 * Math.random() - 1); // Vertical angle (uniform distribution)
+
+        const targetGeometry = new THREE.IcosahedronGeometry(1);
+        const target = new THREE.Mesh(targetGeometry, targetMaterial);
+
+        const targetPos = new THREE.Vector3(
+          21 * Math.sin(phi) * Math.cos(theta),
+          21 * Math.cos(phi),
+          21 * Math.sin(phi) * Math.sin(theta),
+        );
+
+        target.position.copy(targetPos);
+        target.lookAt(targetPos.clone().multiplyScalar(2)); // Orient away from planet
+        scene.add(target);
+        targets.push(target);
+      }
+      return targets;
+    };
+
+    // Create initial targets
+    const targets = createTargets();
+    targetsRef.current = targets;
+
+    // Expose createTargets for reset
+    mountRef.current.createTargets = createTargets;
 
     // Projectile
     let projectile = null;
@@ -306,6 +382,32 @@ function App() {
       player.position.x = radius * Math.sin(phi) * Math.sin(theta);
       player.position.y = radius * Math.cos(phi);
       player.position.z = radius * Math.sin(phi) * Math.cos(theta);
+      
+      // Orient player properly on sphere surface
+      // Y-axis points away from planet (up)
+      const up = player.position.clone().normalize();
+      
+      // Z-axis points north (toward north pole)
+      const north = new THREE.Vector3(0, 1, 0);
+      let forward = north.clone().sub(up.clone().multiplyScalar(north.dot(up))).normalize();
+      
+      // Handle case when player is at poles
+      if (forward.length() < 0.01) {
+        forward = new THREE.Vector3(0, 0, 1);
+      }
+      
+      // X-axis is right (cross product of up and forward)
+      const right = new THREE.Vector3().crossVectors(up, forward).normalize();
+      
+      // Recompute forward to ensure orthogonality
+      forward = new THREE.Vector3().crossVectors(right, up).normalize();
+      
+      // Create rotation matrix
+      const matrix = new THREE.Matrix4();
+      matrix.makeBasis(right, up, forward);
+      
+      // Apply rotation to player
+      player.quaternion.setFromRotationMatrix(matrix);
     };
 
     // Animation
@@ -358,16 +460,22 @@ function App() {
 
         // Check collision with targets first
         let hitTarget = false;
-        for (let i = targets.length - 1; i >= 0; i--) {
-          if (projectile.position.distanceTo(targets[i].position) < 3) {
+        const currentTargets = targetsRef.current;
+        for (let i = currentTargets.length - 1; i >= 0; i--) {
+          if (projectile.position.distanceTo(currentTargets[i].position) < 3) {
             // Hit a target!
             createImpactMark(projectile.position, true); // Red explosion for hit
-            scene.remove(targets[i]);
-            targets.splice(i, 1);
+            scene.remove(currentTargets[i]);
+            currentTargets.splice(i, 1);
             scene.remove(projectile);
             projectile = null;
             hitTarget = true;
-            setScore(prevScore => prevScore + 1); // Increment score
+            setKills(prevKills => prevKills + 1); // Increment kills
+            
+            // Check for victory
+            if (currentTargets.length === 0) {
+              setVictory(true);
+            }
             break;
           }
         }
@@ -420,6 +528,100 @@ function App() {
   const handleLaunch = () => {
     if (mountRef.current && mountRef.current.launchProjectile) {
       mountRef.current.launchProjectile(velocity, angle, heading);
+      setShots(prevShots => prevShots + 1); // Increment shots
+    }
+  };
+
+  // Update indicator when angle or heading changes
+  useEffect(() => {
+    if (mountRef.current && mountRef.current.updateIndicator) {
+      mountRef.current.updateIndicator(angle, heading);
+    }
+  }, [angle, heading]);
+
+  // Add touch event listeners with passive: false to fix console warning
+  useEffect(() => {
+    const joystick = joystickRef.current;
+    if (!joystick) return;
+
+    const handleTouchStart = (e) => {
+      e.preventDefault();
+      setJoystickActive(true);
+      const touch = e.touches[0];
+      const rect = joystick.getBoundingClientRect();
+      const centerX = rect.width / 2;
+      const centerY = rect.height / 2;
+      const x = touch.clientX - rect.left - centerX;
+      const y = touch.clientY - rect.top - centerY;
+      const distance = Math.sqrt(x * x + y * y);
+      const maxDistance = 40;
+      const clampedX = distance > maxDistance ? (x / distance) * maxDistance : x;
+      const clampedY = distance > maxDistance ? (y / distance) * maxDistance : y;
+      setJoystickPos({ x: clampedX, y: clampedY });
+      
+      keysRef.current.w = clampedY < -15;
+      keysRef.current.s = clampedY > 15;
+      keysRef.current.a = clampedX < -15;
+      keysRef.current.d = clampedX > 15;
+    };
+
+    const handleTouchMove = (e) => {
+      e.preventDefault();
+      const touch = e.touches[0];
+      const rect = joystick.getBoundingClientRect();
+      const centerX = rect.width / 2;
+      const centerY = rect.height / 2;
+      const x = touch.clientX - rect.left - centerX;
+      const y = touch.clientY - rect.top - centerY;
+      const distance = Math.sqrt(x * x + y * y);
+      const maxDistance = 40;
+      const clampedX = distance > maxDistance ? (x / distance) * maxDistance : x;
+      const clampedY = distance > maxDistance ? (y / distance) * maxDistance : y;
+      setJoystickPos({ x: clampedX, y: clampedY });
+      
+      keysRef.current.w = clampedY < -15;
+      keysRef.current.s = clampedY > 15;
+      keysRef.current.a = clampedX < -15;
+      keysRef.current.d = clampedX > 15;
+    };
+
+    const handleTouchEnd = (e) => {
+      e.preventDefault();
+      setJoystickActive(false);
+      setJoystickPos({ x: 0, y: 0 });
+      keysRef.current.w = false;
+      keysRef.current.s = false;
+      keysRef.current.a = false;
+      keysRef.current.d = false;
+    };
+
+    joystick.addEventListener('touchstart', handleTouchStart, { passive: false });
+    joystick.addEventListener('touchmove', handleTouchMove, { passive: false });
+    joystick.addEventListener('touchend', handleTouchEnd, { passive: false });
+
+    return () => {
+      joystick.removeEventListener('touchstart', handleTouchStart);
+      joystick.removeEventListener('touchmove', handleTouchMove);
+      joystick.removeEventListener('touchend', handleTouchEnd);
+    };
+  }, []);
+
+  const handlePlayAgain = () => {
+    if (mountRef.current && mountRef.current.createTargets) {
+      // Remove old targets
+      targetsRef.current.forEach(target => {
+        const scene = mountRef.current.children[0]; // Access scene from renderer
+        if (scene) scene.remove(target);
+      });
+      
+      // Create new targets
+      const newTargets = mountRef.current.createTargets();
+      targetsRef.current = newTargets;
+      
+      // Reset game state
+      setKills(0);
+      setShots(0);
+      setVictory(false);
     }
   };
 
@@ -431,8 +633,8 @@ function App() {
       <div
         style={{
           position: "absolute",
-          top: "20px",
-          right: "20px",
+          top: "0px",
+          right: "0px",
           background: "rgba(0,0,0,0.5)",
           color: "white",
           padding: "10px",
@@ -440,16 +642,18 @@ function App() {
           fontWeight: "bold",
         }}
       >
-        Score: {score}
+        Score: {kills * 100}
       </div>
       
       {/* Launch controls - bottom right, 60% width */}
       <div
         style={{
           position: "absolute",
-          bottom: "20px",
-          right: "20px",
-          width: "60%",
+          bottom: "0px",
+          right: "0px",
+          left: "0px",
+          maxWidth: "60%",
+          marginLeft: "auto",
           background: "rgba(0,0,0,0.5)",
           color: "white",
           padding: "10px",
@@ -493,98 +697,147 @@ function App() {
         </button>
       </div>
       
-      {/* WASD buttons - bottom left */}
+      {/* Victory Dialog */}
+      {victory && (
+        <div
+          style={{
+            position: "absolute",
+            top: "50%",
+            left: "50%",
+            transform: "translate(-50%, -50%)",
+            background: "rgba(0,0,0,0.9)",
+            color: "white",
+            padding: "40px",
+            borderRadius: "10px",
+            border: "3px solid white",
+            textAlign: "center",
+            zIndex: 1000,
+          }}
+        >
+          <h1 style={{ fontSize: "48px", margin: "0 0 20px 0" }}>VICTORY!</h1>
+          <p style={{ fontSize: "20px", margin: "0 0 10px 0" }}>
+            Kills: {kills} × 100 = {kills * 100}
+          </p>
+          <p style={{ fontSize: "20px", margin: "0 0 10px 0" }}>
+            Shots: {shots} × -30 = {shots * -30}
+          </p>
+          <p style={{ fontSize: "20px", margin: "0 0 20px 0" }}>
+            Time: {Math.floor((Date.now() - startTime) / 1000)}s × -1 = -{Math.floor((Date.now() - startTime) / 1000)}
+          </p>
+          <p style={{ fontSize: "28px", margin: "0 0 30px 0", fontWeight: "bold", borderTop: "2px solid white", paddingTop: "10px" }}>
+            Final Score: {kills * 100 - shots * 30 - Math.floor((Date.now() - startTime) / 1000)}
+          </p>
+          <button
+            onClick={handlePlayAgain}
+            style={{
+              fontSize: "24px",
+              padding: "15px 30px",
+              background: "white",
+              color: "black",
+              border: "none",
+              borderRadius: "5px",
+              cursor: "pointer",
+              fontWeight: "bold",
+            }}
+          >
+            PLAY AGAIN
+          </button>
+        </div>
+      )}
+
+      {/* Virtual Joystick - bottom left */}
       <div
+        ref={joystickRef}
         style={{
           position: "absolute",
-          bottom: "20px",
-          left: "20px",
-          display: "grid",
-          gridTemplateColumns: "60px 60px 60px",
-          gridTemplateRows: "60px 60px",
-          gap: "5px",
+          bottom: "0px",
+          left: "0px",
+          width: "120px",
+          height: "120px",
+        }}
+        onMouseDown={(e) => {
+          setJoystickActive(true);
+          const rect = e.currentTarget.getBoundingClientRect();
+          const centerX = rect.width / 2;
+          const centerY = rect.height / 2;
+          const x = e.clientX - rect.left - centerX;
+          const y = e.clientY - rect.top - centerY;
+          const distance = Math.sqrt(x * x + y * y);
+          const maxDistance = 40;
+          const clampedX = distance > maxDistance ? (x / distance) * maxDistance : x;
+          const clampedY = distance > maxDistance ? (y / distance) * maxDistance : y;
+          setJoystickPos({ x: clampedX, y: clampedY });
+          
+          // Update keys based on joystick position
+          keysRef.current.w = clampedY < -15;
+          keysRef.current.s = clampedY > 15;
+          keysRef.current.a = clampedX < -15;
+          keysRef.current.d = clampedX > 15;
+        }}
+        onMouseMove={(e) => {
+          if (!joystickActive) return;
+          const rect = e.currentTarget.getBoundingClientRect();
+          const centerX = rect.width / 2;
+          const centerY = rect.height / 2;
+          const x = e.clientX - rect.left - centerX;
+          const y = e.clientY - rect.top - centerY;
+          const distance = Math.sqrt(x * x + y * y);
+          const maxDistance = 40;
+          const clampedX = distance > maxDistance ? (x / distance) * maxDistance : x;
+          const clampedY = distance > maxDistance ? (y / distance) * maxDistance : y;
+          setJoystickPos({ x: clampedX, y: clampedY });
+          
+          // Update keys based on joystick position
+          keysRef.current.w = clampedY < -15;
+          keysRef.current.s = clampedY > 15;
+          keysRef.current.a = clampedX < -15;
+          keysRef.current.d = clampedX > 15;
+        }}
+        onMouseUp={() => {
+          setJoystickActive(false);
+          setJoystickPos({ x: 0, y: 0 });
+          keysRef.current.w = false;
+          keysRef.current.s = false;
+          keysRef.current.a = false;
+          keysRef.current.d = false;
+        }}
+        onMouseLeave={() => {
+          if (joystickActive) {
+            setJoystickActive(false);
+            setJoystickPos({ x: 0, y: 0 });
+            keysRef.current.w = false;
+            keysRef.current.s = false;
+            keysRef.current.a = false;
+            keysRef.current.d = false;
+          }
         }}
       >
-        <div style={{ gridColumn: "2" }}>
-          <button
-            style={{
-              width: "60px",
-              height: "60px",
-              fontSize: "20px",
-              fontWeight: "bold",
-              background: "rgba(0,0,0,0.5)",
-              color: "white",
-              border: "2px solid white",
-            }}
-            onMouseDown={() => { keysRef.current.w = true; }}
-            onMouseUp={() => { keysRef.current.w = false; }}
-            onMouseLeave={() => { keysRef.current.w = false; }}
-            onTouchStart={(e) => { e.preventDefault(); keysRef.current.w = true; }}
-            onTouchEnd={(e) => { e.preventDefault(); keysRef.current.w = false; }}
-          >
-            W
-          </button>
-        </div>
-        <div style={{ gridColumn: "1", gridRow: "2" }}>
-          <button
-            style={{
-              width: "60px",
-              height: "60px",
-              fontSize: "20px",
-              fontWeight: "bold",
-              background: "rgba(0,0,0,0.5)",
-              color: "white",
-              border: "2px solid white",
-            }}
-            onMouseDown={() => { keysRef.current.a = true; }}
-            onMouseUp={() => { keysRef.current.a = false; }}
-            onMouseLeave={() => { keysRef.current.a = false; }}
-            onTouchStart={(e) => { e.preventDefault(); keysRef.current.a = true; }}
-            onTouchEnd={(e) => { e.preventDefault(); keysRef.current.a = false; }}
-          >
-            A
-          </button>
-        </div>
-        <div style={{ gridColumn: "2", gridRow: "2" }}>
-          <button
-            style={{
-              width: "60px",
-              height: "60px",
-              fontSize: "20px",
-              fontWeight: "bold",
-              background: "rgba(0,0,0,0.5)",
-              color: "white",
-              border: "2px solid white",
-            }}
-            onMouseDown={() => { keysRef.current.s = true; }}
-            onMouseUp={() => { keysRef.current.s = false; }}
-            onMouseLeave={() => { keysRef.current.s = false; }}
-            onTouchStart={(e) => { e.preventDefault(); keysRef.current.s = true; }}
-            onTouchEnd={(e) => { e.preventDefault(); keysRef.current.s = false; }}
-          >
-            S
-          </button>
-        </div>
-        <div style={{ gridColumn: "3", gridRow: "2" }}>
-          <button
-            style={{
-              width: "60px",
-              height: "60px",
-              fontSize: "20px",
-              fontWeight: "bold",
-              background: "rgba(0,0,0,0.5)",
-              color: "white",
-              border: "2px solid white",
-            }}
-            onMouseDown={() => { keysRef.current.d = true; }}
-            onMouseUp={() => { keysRef.current.d = false; }}
-            onMouseLeave={() => { keysRef.current.d = false; }}
-            onTouchStart={(e) => { e.preventDefault(); keysRef.current.d = true; }}
-            onTouchEnd={(e) => { e.preventDefault(); keysRef.current.d = false; }}
-          >
-            D
-          </button>
-        </div>
+        {/* Joystick base */}
+        <div
+          style={{
+            position: "absolute",
+            width: "120px",
+            height: "120px",
+            borderRadius: "50%",
+            background: "rgba(0,0,0,0.3)",
+            border: "3px solid rgba(255,255,255,0.5)",
+          }}
+        />
+        {/* Joystick knob */}
+        <div
+          style={{
+            position: "absolute",
+            width: "50px",
+            height: "50px",
+            borderRadius: "50%",
+            background: "rgba(255,255,255,0.7)",
+            border: "2px solid white",
+            left: `${60 + joystickPos.x - 25}px`,
+            top: `${60 + joystickPos.y - 25}px`,
+            transition: joystickActive ? "none" : "all 0.2s ease-out",
+            boxShadow: "0 2px 10px rgba(0,0,0,0.3)",
+          }}
+        />
       </div>
     </div>
   );
