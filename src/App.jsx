@@ -1,6 +1,7 @@
 import { useRef, useEffect, useState } from "react";
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls";
+import { TrackballControls } from "three/examples/jsm/Addons.js";
 import { EffectComposer } from "three/examples/jsm/postprocessing/EffectComposer";
 import { RenderPixelatedPass } from "three/examples/jsm/postprocessing/RenderPixelatedPass";
 import { OutputPass } from "three/examples/jsm/postprocessing/OutputPass";
@@ -209,6 +210,38 @@ function App() {
     // Explosion particles
     const explosionParticles = [];
 
+    // Function to get surface radius at a given direction using weighted average
+    const getSurfaceRadius = (direction) => {
+      const dir = direction.clone().normalize();
+      const positions = planetGeometry.attributes.position;
+      const vertex = new THREE.Vector3();
+      
+      let totalRadius = 0;
+      let totalWeight = 0;
+      const threshold = 0.2; // Tighter angular threshold (in radians)
+      
+      // Find vertices close to the direction and use weighted average
+      for (let i = 0; i < positions.count; i++) {
+        vertex.fromBufferAttribute(positions, i);
+        const vertexDir = vertex.clone().normalize();
+        const angle = Math.acos(Math.max(-1, Math.min(1, dir.dot(vertexDir))));
+        
+        if (angle < threshold) {
+          // Weight by inverse of angle - closer vertices have more influence
+          const weight = 1.0 / (angle + 0.01); // +0.01 to avoid division by zero
+          totalRadius += vertex.length() * weight;
+          totalWeight += weight;
+        }
+      }
+      
+      if (totalWeight > 0) {
+        return totalRadius / totalWeight;
+      }
+      
+      // Fallback to default radius
+      return 20;
+    };
+
     // Function to deform planet at impact point
     const deformPlanet = (impactPoint, craterDepth = 2) => {
       // Convert impact point from world space to planet's local space
@@ -249,6 +282,19 @@ function App() {
 
       positions.needsUpdate = true;
       planetGeometry.computeVertexNormals();
+      
+      // Update player position to match new terrain
+      const playerDir = player.position.clone().normalize();
+      const newRadius = getSurfaceRadius(playerDir) + 1; // +1 for player size
+      player.position.copy(playerDir.multiplyScalar(newRadius));
+      
+      // Update target positions to match new terrain
+      const currentTargets = targetsRef.current;
+      for (let i = 0; i < currentTargets.length; i++) {
+        const targetDir = currentTargets[i].position.clone().normalize();
+        const targetRadius = getSurfaceRadius(targetDir) + 1; // +1 for target size
+        currentTargets[i].position.copy(targetDir.multiplyScalar(targetRadius));
+      }
     };
 
     // Function to create explosion particles
@@ -363,7 +409,6 @@ function App() {
     // Update player position based on key states
     const updatePlayerPosition = () => {
       const speed = 0.005; // Reduced to 1/10th speed
-      const radius = 21;
       const currentPos = player.position.clone().normalize();
 
       // Calculate current spherical coordinates
@@ -378,10 +423,18 @@ function App() {
       // Clamp phi to valid range
       phi = Math.max(0.01, Math.min(Math.PI - 0.01, phi));
 
-      // Convert back to Cartesian coordinates
-      player.position.x = radius * Math.sin(phi) * Math.sin(theta);
-      player.position.y = radius * Math.cos(phi);
-      player.position.z = radius * Math.sin(phi) * Math.cos(theta);
+      // Calculate direction
+      const direction = new THREE.Vector3(
+        Math.sin(phi) * Math.sin(theta),
+        Math.cos(phi),
+        Math.sin(phi) * Math.cos(theta)
+      );
+      
+      // Get actual surface radius at this position and add player height
+      const surfaceRadius = getSurfaceRadius(direction) + 1; // +1 for player size
+      
+      // Set position to match terrain
+      player.position.copy(direction.multiplyScalar(surfaceRadius));
       
       // Orient player properly on sphere surface
       // Y-axis points away from planet (up)
