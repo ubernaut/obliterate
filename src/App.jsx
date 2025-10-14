@@ -12,6 +12,7 @@ function App() {
   const [velocity, setVelocity] = useState(50);
   const [angle, setAngle] = useState(45);
   const [heading, setHeading] = useState(0);
+  const [score, setScore] = useState(0);
 
   useEffect(() => {
     const currentMount = mountRef.current;
@@ -365,6 +366,7 @@ function App() {
             scene.remove(projectile);
             projectile = null;
             hitTarget = true;
+            setScore(prevScore => prevScore + 1); // Increment score
             break;
           }
         }
@@ -423,6 +425,20 @@ function App() {
   return (
     <div>
       <div ref={mountRef} style={{ width: "100%", height: "100vh" }} />
+      <div
+        style={{
+          position: "absolute",
+          top: "20px",
+          right: "20px",
+          background: "rgba(0,0,0,0.5)",
+          color: "white",
+          padding: "10px",
+          fontSize: "24px",
+          fontWeight: "bold",
+        }}
+      >
+        Score: {score}
+      </div>
       <div
         style={{
           position: "absolute",
