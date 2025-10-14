@@ -59,8 +59,10 @@ function App() {
     composer.addPass(outputPass);
 
     // Controls
-    const controls = new OrbitControls(camera, renderer.domElement);
+    const controls = new TrackballControls(camera, renderer.domElement);
     controls.enableDamping = true;
+    controls.noPan = true;
+    controls.noZoom = true;
 
     // Planet with modifiable geometry
     //    const planetGeometry = new THREE.SphereGeometry(20, 32, 32);
@@ -121,33 +123,36 @@ function App() {
       const angleRad = (ang * Math.PI) / 180;
       const headingRad = (head * Math.PI) / 180;
       
-      // Calculate direction in world space (same as projectile)
+      // Calculate direction in world space using screen-relative coordinates
       const playerNormal = player.position.clone().normalize();
       
-      // Use a reference vector that won't be parallel to the normal
-      let refVector = new THREE.Vector3(0, 1, 0);
-      if (Math.abs(playerNormal.dot(refVector)) > 0.9) {
-        refVector = new THREE.Vector3(1, 0, 0);
-      }
+      // Get camera's up and right vectors (screen-relative)
+      const cameraUp = camera.up.clone().normalize();
+      const cameraRight = new THREE.Vector3().crossVectors(
+        camera.position.clone().normalize().negate(),
+        cameraUp
+      ).normalize();
       
-      const tangent = new THREE.Vector3()
-        .crossVectors(refVector, playerNormal)
-        .normalize();
-      const bitangent = new THREE.Vector3()
-        .crossVectors(playerNormal, tangent)
-        .normalize();
+      // Project camera vectors onto tangent plane at player position
+      const screenUp = cameraUp.clone().sub(
+        playerNormal.clone().multiplyScalar(cameraUp.dot(playerNormal))
+      ).normalize();
+      const screenRight = cameraRight.clone().sub(
+        playerNormal.clone().multiplyScalar(cameraRight.dot(playerNormal))
+      ).normalize();
       
       const worldDirection = new THREE.Vector3();
       worldDirection.add(playerNormal.clone().multiplyScalar(Math.sin(angleRad)));
+      // heading 0 = screen up, 90 = screen right
       worldDirection.add(
-        tangent
-          .clone()
-          .multiplyScalar(Math.cos(angleRad) * Math.sin(headingRad))
-      );
-      worldDirection.add(
-        bitangent
+        screenUp
           .clone()
           .multiplyScalar(Math.cos(angleRad) * Math.cos(headingRad))
+      );
+      worldDirection.add(
+        screenRight
+          .clone()
+          .multiplyScalar(Math.cos(angleRad) * Math.sin(headingRad))
       );
       worldDirection.normalize();
       
@@ -365,36 +370,39 @@ function App() {
       scene.add(projectile);
 
       const angleRad = (ang * Math.PI) / 180;
-      const headingRad = (head * Math.PI) / 180; // 0° = North, 90° = East
+      const headingRad = (head * Math.PI) / 180; // 0° = screen up, 90° = screen right
       const scaledVel = vel / 100; // Reduced to 1/10th speed
 
       const playerNormal = player.position.clone().normalize();
 
-      // Use a reference vector that won't be parallel to the normal
-      let refVector = new THREE.Vector3(0, 1, 0);
-      if (Math.abs(playerNormal.dot(refVector)) > 0.9) {
-        refVector = new THREE.Vector3(1, 0, 0);
-      }
-
-      const tangent = new THREE.Vector3()
-        .crossVectors(refVector, playerNormal)
-        .normalize();
-      const bitangent = new THREE.Vector3()
-        .crossVectors(playerNormal, tangent)
-        .normalize();
+      // Get camera's up and right vectors (screen-relative)
+      const cameraUp = camera.up.clone().normalize();
+      const cameraRight = new THREE.Vector3().crossVectors(
+        camera.position.clone().normalize().negate(),
+        cameraUp
+      ).normalize();
+      
+      // Project camera vectors onto tangent plane at player position
+      const screenUp = cameraUp.clone().sub(
+        playerNormal.clone().multiplyScalar(cameraUp.dot(playerNormal))
+      ).normalize();
+      const screenRight = cameraRight.clone().sub(
+        playerNormal.clone().multiplyScalar(cameraRight.dot(playerNormal))
+      ).normalize();
 
       const direction = new THREE.Vector3();
-      direction.add(playerNormal.clone().multiplyScalar(Math.sin(angleRad))); // sin for normal: 0° = 0, 90° = 1
+      direction.add(playerNormal.clone().multiplyScalar(Math.sin(angleRad)));
+      // heading 0 = screen up, 90 = screen right
       direction.add(
-        tangent
+        screenUp
           .clone()
-          .multiplyScalar(Math.cos(angleRad) * Math.sin(headingRad)),
-      ); // sin for East component
+          .multiplyScalar(Math.cos(angleRad) * Math.cos(headingRad))
+      );
       direction.add(
-        bitangent
+        screenRight
           .clone()
-          .multiplyScalar(Math.cos(angleRad) * Math.cos(headingRad)),
-      ); // cos for North component
+          .multiplyScalar(Math.cos(angleRad) * Math.sin(headingRad))
+      );
       direction.normalize();
 
       projectileVelocity.copy(direction.multiplyScalar(scaledVel));
@@ -410,6 +418,32 @@ function App() {
       if (key in keys) {
         keys[key] = true;
       }
+      
+      // Handle spacebar for shooting
+      if (event.key === ' ') {
+        event.preventDefault();
+        launchProjectile(mountRef.current?.velocity || 50, mountRef.current?.angle || 45, mountRef.current?.heading || 0);
+      }
+      
+      // Handle Q and E for heading adjustment
+      if (key === 'q') {
+        event.preventDefault();
+        const newHeading = ((mountRef.current?.heading || 0) - 5 + 360) % 360;
+        if (mountRef.current) {
+          mountRef.current.heading = newHeading;
+          mountRef.current.updateIndicator?.(mountRef.current.angle || 45, newHeading);
+        }
+        setHeading(newHeading);
+      }
+      if (key === 'e') {
+        event.preventDefault();
+        const newHeading = ((mountRef.current?.heading || 0) + 5) % 360;
+        if (mountRef.current) {
+          mountRef.current.heading = newHeading;
+          mountRef.current.updateIndicator?.(mountRef.current.angle || 45, newHeading);
+        }
+        setHeading(newHeading);
+      }
     };
 
     const handleKeyUp = (event) => {
@@ -421,48 +455,76 @@ function App() {
 
     window.addEventListener("keydown", handleKeyDown);
     window.addEventListener("keyup", handleKeyUp);
+    
+    // Store current values in mountRef for keyboard access
+    mountRef.current.velocity = velocity;
+    mountRef.current.angle = angle;
+    mountRef.current.heading = heading;
 
     // Update player position based on key states
     const updatePlayerPosition = () => {
-      const speed = 0.005; // Reduced to 1/10th speed
-      const currentPos = player.position.clone().normalize();
-
-      // Calculate current spherical coordinates
-      let theta = Math.atan2(currentPos.x, currentPos.z);
-      let phi = Math.acos(currentPos.y); // currentPos is already normalized, so y is in [-1, 1]
-
-      if (keys.w) phi -= speed; // Move north
-      if (keys.s) phi += speed; // Move south
-      if (keys.a) theta -= speed; // Move west
-      if (keys.d) theta += speed; // Move east
-
-      // Clamp phi to valid range
-      phi = Math.max(0.01, Math.min(Math.PI - 0.01, phi));
-
-      // Calculate direction
-      const direction = new THREE.Vector3(
-        Math.sin(phi) * Math.sin(theta),
-        Math.cos(phi),
-        Math.sin(phi) * Math.cos(theta)
-      );
+      const speed = 0.05; // Movement speed
+      const currentPos = player.position.clone();
+      const playerNormal = currentPos.clone().normalize();
       
-      // Get actual surface radius at this position and add player height
-      const surfaceRadius = getSurfaceRadius(direction) + 1; // +1 for player size
+      // Get camera's up and right vectors (screen-relative)
+      const cameraUp = camera.up.clone().normalize();
+      const cameraRight = new THREE.Vector3().crossVectors(
+        camera.position.clone().normalize().negate(),
+        cameraUp
+      ).normalize();
       
-      // Set position to match terrain
-      player.position.copy(direction.multiplyScalar(surfaceRadius));
+      // Project camera vectors onto tangent plane at player position
+      const screenUp = cameraUp.clone().sub(
+        playerNormal.clone().multiplyScalar(cameraUp.dot(playerNormal))
+      ).normalize();
+      const screenRight = cameraRight.clone().sub(
+        playerNormal.clone().multiplyScalar(cameraRight.dot(playerNormal))
+      ).normalize();
       
-      // Orient player properly on sphere surface
+      // Calculate movement direction in screen-relative coordinates
+      const movement = new THREE.Vector3();
+      if (keys.w) movement.add(screenUp.clone().multiplyScalar(speed)); // Move screen up
+      if (keys.s) movement.add(screenUp.clone().multiplyScalar(-speed)); // Move screen down
+      if (keys.a) movement.add(screenRight.clone().multiplyScalar(-speed)); // Move screen left
+      if (keys.d) movement.add(screenRight.clone().multiplyScalar(speed)); // Move screen right
+      
+      // Apply movement
+      if (movement.length() > 0) {
+        currentPos.add(movement);
+        
+        // Project back onto sphere surface
+        const direction = currentPos.clone().normalize();
+        const surfaceRadius = getSurfaceRadius(direction) + 1; // +1 for player size
+        player.position.copy(direction.multiplyScalar(surfaceRadius));
+        
+        // Smoothly move camera above player when moving
+        const cameraDistance = 50;
+        const targetCameraPos = player.position.clone().normalize().multiplyScalar(cameraDistance);
+        camera.position.lerp(targetCameraPos, 0.1); // Smooth interpolation
+        camera.lookAt(0, 0, 0); // Look at planet center
+      }
+      
+      // Orient player properly on sphere surface using screen-relative coordinates
       // Y-axis points away from planet (up)
       const up = player.position.clone().normalize();
       
-      // Z-axis points north (toward north pole)
-      const north = new THREE.Vector3(0, 1, 0);
-      let forward = north.clone().sub(up.clone().multiplyScalar(north.dot(up))).normalize();
+      // Use screen-up as forward direction (project onto tangent plane)
+      const cameraUpForOrientation = camera.up.clone().normalize();
+      let forward = cameraUpForOrientation.clone().sub(
+        up.clone().multiplyScalar(cameraUpForOrientation.dot(up))
+      ).normalize();
       
-      // Handle case when player is at poles
+      // Handle case when camera up is parallel to player normal
       if (forward.length() < 0.01) {
-        forward = new THREE.Vector3(0, 0, 1);
+        // Use camera right as fallback
+        const cameraRightForOrientation = new THREE.Vector3().crossVectors(
+          camera.position.clone().normalize().negate(),
+          cameraUpForOrientation
+        ).normalize();
+        forward = cameraRightForOrientation.clone().sub(
+          up.clone().multiplyScalar(cameraRightForOrientation.dot(up))
+        ).normalize();
       }
       
       // X-axis is right (cross product of up and forward)
@@ -600,6 +662,15 @@ function App() {
       setShots(prevShots => prevShots + 1); // Increment shots
     }
   };
+
+  // Update mountRef values when state changes
+  useEffect(() => {
+    if (mountRef.current) {
+      mountRef.current.velocity = velocity;
+      mountRef.current.angle = angle;
+      mountRef.current.heading = heading;
+    }
+  }, [velocity, angle, heading]);
 
   // Update indicator when angle or heading changes
   useEffect(() => {
