@@ -13,6 +13,7 @@ function App() {
   const [angle, setAngle] = useState(45);
   const [heading, setHeading] = useState(0);
   const [score, setScore] = useState(0);
+  const keysRef = useRef({ w: false, a: false, s: false, d: false });
 
   useEffect(() => {
     const currentMount = mountRef.current;
@@ -264,7 +265,7 @@ function App() {
     mountRef.current.launchProjectile = launchProjectile;
 
     // Keyboard controls with key state tracking
-    const keys = { w: false, a: false, s: false, d: false };
+    const keys = keysRef.current;
 
     const handleKeyDown = (event) => {
       const key = event.key.toLowerCase();
@@ -425,6 +426,8 @@ function App() {
   return (
     <div>
       <div ref={mountRef} style={{ width: "100%", height: "100vh" }} />
+      
+      {/* Score display - top right */}
       <div
         style={{
           position: "absolute",
@@ -439,11 +442,14 @@ function App() {
       >
         Score: {score}
       </div>
+      
+      {/* Launch controls - bottom right, 60% width */}
       <div
         style={{
           position: "absolute",
-          top: "20px",
-          left: "20px",
+          bottom: "20px",
+          right: "20px",
+          width: "60%",
           background: "rgba(0,0,0,0.5)",
           color: "white",
           padding: "10px",
@@ -457,6 +463,7 @@ function App() {
             max="100"
             value={velocity}
             onChange={(e) => setVelocity(Number(e.target.value))}
+            style={{ width: "100%" }}
           />
         </div>
         <div>
@@ -467,6 +474,7 @@ function App() {
             max="90"
             value={angle}
             onChange={(e) => setAngle(Number(e.target.value))}
+            style={{ width: "100%" }}
           />
         </div>
         <div>
@@ -477,9 +485,106 @@ function App() {
             max="359"
             value={heading}
             onChange={(e) => setHeading(Number(e.target.value))}
+            style={{ width: "100%" }}
           />
         </div>
-        <button onClick={handleLaunch}>Launch</button>
+        <button onClick={handleLaunch} style={{ width: "100%", padding: "10px", marginTop: "10px" }}>
+          Launch
+        </button>
+      </div>
+      
+      {/* WASD buttons - bottom left */}
+      <div
+        style={{
+          position: "absolute",
+          bottom: "20px",
+          left: "20px",
+          display: "grid",
+          gridTemplateColumns: "60px 60px 60px",
+          gridTemplateRows: "60px 60px",
+          gap: "5px",
+        }}
+      >
+        <div style={{ gridColumn: "2" }}>
+          <button
+            style={{
+              width: "60px",
+              height: "60px",
+              fontSize: "20px",
+              fontWeight: "bold",
+              background: "rgba(0,0,0,0.5)",
+              color: "white",
+              border: "2px solid white",
+            }}
+            onMouseDown={() => { keysRef.current.w = true; }}
+            onMouseUp={() => { keysRef.current.w = false; }}
+            onMouseLeave={() => { keysRef.current.w = false; }}
+            onTouchStart={(e) => { e.preventDefault(); keysRef.current.w = true; }}
+            onTouchEnd={(e) => { e.preventDefault(); keysRef.current.w = false; }}
+          >
+            W
+          </button>
+        </div>
+        <div style={{ gridColumn: "1", gridRow: "2" }}>
+          <button
+            style={{
+              width: "60px",
+              height: "60px",
+              fontSize: "20px",
+              fontWeight: "bold",
+              background: "rgba(0,0,0,0.5)",
+              color: "white",
+              border: "2px solid white",
+            }}
+            onMouseDown={() => { keysRef.current.a = true; }}
+            onMouseUp={() => { keysRef.current.a = false; }}
+            onMouseLeave={() => { keysRef.current.a = false; }}
+            onTouchStart={(e) => { e.preventDefault(); keysRef.current.a = true; }}
+            onTouchEnd={(e) => { e.preventDefault(); keysRef.current.a = false; }}
+          >
+            A
+          </button>
+        </div>
+        <div style={{ gridColumn: "2", gridRow: "2" }}>
+          <button
+            style={{
+              width: "60px",
+              height: "60px",
+              fontSize: "20px",
+              fontWeight: "bold",
+              background: "rgba(0,0,0,0.5)",
+              color: "white",
+              border: "2px solid white",
+            }}
+            onMouseDown={() => { keysRef.current.s = true; }}
+            onMouseUp={() => { keysRef.current.s = false; }}
+            onMouseLeave={() => { keysRef.current.s = false; }}
+            onTouchStart={(e) => { e.preventDefault(); keysRef.current.s = true; }}
+            onTouchEnd={(e) => { e.preventDefault(); keysRef.current.s = false; }}
+          >
+            S
+          </button>
+        </div>
+        <div style={{ gridColumn: "3", gridRow: "2" }}>
+          <button
+            style={{
+              width: "60px",
+              height: "60px",
+              fontSize: "20px",
+              fontWeight: "bold",
+              background: "rgba(0,0,0,0.5)",
+              color: "white",
+              border: "2px solid white",
+            }}
+            onMouseDown={() => { keysRef.current.d = true; }}
+            onMouseUp={() => { keysRef.current.d = false; }}
+            onMouseLeave={() => { keysRef.current.d = false; }}
+            onTouchStart={(e) => { e.preventDefault(); keysRef.current.d = true; }}
+            onTouchEnd={(e) => { e.preventDefault(); keysRef.current.d = false; }}
+          >
+            D
+          </button>
+        </div>
       </div>
     </div>
   );
