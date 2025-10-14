@@ -41,7 +41,7 @@ function App() {
     //    const options = {RenderPixelatedPassParameters:{ normalEdgeStrength: 2, depthEdgeStrength: 1 }};
     const options = { normalEdgeStrength: 2, depthEdgeStrength: 1 };
     const renderPixelatedPass = new RenderPixelatedPass(
-      4,
+      2,
       scene,
       camera,
       options,
