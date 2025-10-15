@@ -9,6 +9,7 @@ import { GUI } from "three/addons/libs/lil-gui.module.min.js";
 import { useGameStore } from "./state/stores/gameStore";
 import { useSettingsStore } from "./state/stores/settingsStore";
 import { useAudio } from "./hooks/useAudio";
+import { useOpenGameSDK } from "./hooks/useOpenGameSDK";
 import SplashScreen from "./components/SplashScreen";
 import MainMenu from "./components/ui/menus/MainMenu";
 import SettingsMenu from "./components/ui/menus/SettingsMenu";
@@ -52,6 +53,9 @@ function App() {
   
   // Initialize audio (handles volume sync automatically)
   const audio = useAudio();
+  
+  // Initialize OGP SDK for token rewards
+  const { sdk, sdkReady } = useOpenGameSDK('obliterate-3d');
   
   // Local UI state (not in stores)
   const [joystickPos, setJoystickPos] = useState({ x: 0, y: 0 });
@@ -723,6 +727,13 @@ function App() {
       if (currentFuel <= 0 && currentStatus === 'playing') {
         setDefeatReason('outOfFuel');
         useGameStore.getState().defeatSuffered();
+        
+        // Report score to OGP platform
+        const finalScore = getCurrentScore();
+        if (sdk && sdkReady) {
+          sdk.savePoints(finalScore).catch(e => console.error('SDK error:', e));
+        }
+        
         audio.stopMusic();
         audio.playMusic('defeat');
       }
@@ -774,6 +785,13 @@ function App() {
           projectile = null;
           setDefeatReason('suicide');
           defeatSuffered(); // Game over!
+          
+          // Report score to OGP platform
+          const finalScore = getCurrentScore();
+          if (sdk && sdkReady) {
+            sdk.savePoints(finalScore).catch(e => console.error('SDK error:', e));
+          }
+          
           audio.stopMusic();
           audio.playMusic('defeat');
           return; // Stop checking other collisions
@@ -802,6 +820,13 @@ function App() {
             if (impactPosition.distanceTo(player.position) < blastRadius) {
               setDefeatReason('suicide');
               defeatSuffered(); // Killed by own explosion!
+              
+              // Report score to OGP platform
+              const finalScore = getCurrentScore();
+              if (sdk && sdkReady) {
+                sdk.savePoints(finalScore).catch(e => console.error('SDK error:', e));
+              }
+              
               audio.stopMusic();
               audio.playMusic('defeat');
               break; // Don't check for victory if player died
@@ -810,6 +835,13 @@ function App() {
             // Check for victory (only if player survived)
             if (currentTargets.length === 0 && gameStatus === 'playing') {
               victoryAchieved(); // Use store action
+              
+              // Report score to OGP platform
+              const finalScore = getCurrentScore();
+              if (sdk && sdkReady) {
+                sdk.savePoints(finalScore).catch(e => console.error('SDK error:', e));
+              }
+              
               audio.playSFX('victory', { volume: 0.5 });
               audio.stopMusic(); // Stop game music
               audio.playMusic('victory'); // Play victory theme
@@ -832,6 +864,13 @@ function App() {
           if (impactPosition.distanceTo(player.position) < blastRadius) {
             setDefeatReason('suicide');
             defeatSuffered(); // Killed by own explosion!
+            
+            // Report score to OGP platform
+            const finalScore = getCurrentScore();
+            if (sdk && sdkReady) {
+              sdk.savePoints(finalScore).catch(e => console.error('SDK error:', e));
+            }
+            
             audio.stopMusic();
             audio.playMusic('defeat');
           }
