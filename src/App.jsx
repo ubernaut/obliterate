@@ -15,6 +15,7 @@ import MainMenu from "./components/ui/menus/MainMenu";
 import SettingsMenu from "./components/ui/menus/SettingsMenu";
 import PauseMenu from "./components/ui/menus/PauseMenu";
 import DefeatScreen from "./components/ui/menus/DefeatScreen";
+import CreditsScreen from "./components/ui/menus/CreditsScreen";
 import "./App.css";
 
 function App() {
@@ -1052,6 +1053,10 @@ function App() {
 
   if (gameStatus === 'defeat') {
     return <DefeatScreen reason={defeatReason} />;
+  }
+
+  if (gameStatus === 'credits') {
+    return <CreditsScreen />;
   }
 
   return (

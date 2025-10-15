@@ -1,0 +1,56 @@
+.credits-screen {
+  text-align: center;
+  color: white;
+  min-width: clamp(250px, 50vw, 400px);
+  padding: clamp(15px, 3vw, 25px);
+}
+
+.credits-title {
+  font-size: clamp(32px, 7vw, 56px);
+  color: #00ff00;
+  margin: 0 0 clamp(20px, 4vh, 40px) 0;
+  text-shadow: 0 0 clamp(15px, 3vw, 25px) #00ff00;
+  letter-spacing: clamp(2px, 0.6vw, 6px);
+}
+
+.credits-content {
+  margin-bottom: clamp(20px, 4vh, 35px);
+}
+
+.credits-company {
+  font-size: clamp(18px, 3.5vw, 28px);
+  font-weight: bold;
+  color: #00ff00;
+  text-shadow: 0 0 clamp(8px, 1.5vw, 12px) #00ff00;
+  margin: clamp(15px, 3vh, 25px) 0 clamp(8px, 1.5vh, 12px) 0;
+  letter-spacing: clamp(1px, 0.3vw, 3px);
+}
+
+.credits-team {
+  font-size: clamp(14px, 2.5vw, 18px);
+  color: #ffff00;
+  margin: 0 0 clamp(25px, 5vh, 40px) 0;
+}
+
+.credits-tech {
+  font-size: clamp(12px, 1.8vw, 14px);
+  color: rgba(255, 255, 255, 0.6);
+  margin: clamp(20px, 3vh, 30px) 0;
+  line-height: 1.8;
+}
+
+.credits-tech p {
+  margin: clamp(4px, 0.8vh, 6px) 0;
+}
+
+.credits-copyright {
+  font-size: clamp(11px, 1.6vw, 13px);
+  color: rgba(255, 255, 255, 0.5);
+  margin-top: clamp(25px, 5vh, 40px);
+  padding-top: clamp(15px, 3vh, 25px);
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.credits-copyright p {
+  margin: clamp(3px, 0.6vh, 5px) 0;
+}
