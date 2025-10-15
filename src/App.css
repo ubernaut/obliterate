@@ -7,3 +7,12 @@ body {
   width: 100vw;
   height: 100vh;
 }
+
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
+.fuel-critical {
+  animation: blink 1s infinite;
+}

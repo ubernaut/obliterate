@@ -1,0 +1,79 @@
+.main-menu {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: linear-gradient(135deg, #000000 0%, #0a0a0a 50%, #000000 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  animation: fadeIn 0.5s ease;
+}
+
+.menu-content {
+  text-align: center;
+  color: white;
+  padding: clamp(20px, 4vw, 40px);
+  max-width: 90vw;
+  width: clamp(300px, 50vw, 500px);
+}
+
+.menu-title {
+  font-size: clamp(32px, 8vw, 64px);
+  font-weight: bold;
+  margin: 0 0 clamp(5px, 1vh, 10px) 0;
+  color: #00ff00;
+  text-shadow:
+    0 0 clamp(5px, 1vw, 10px) #00ff00,
+    0 0 clamp(10px, 2vw, 20px) #00ff00,
+    0 0 clamp(15px, 3vw, 30px) #00ff00;
+  animation: pulse 2s ease-in-out infinite;
+  letter-spacing: clamp(2px, 0.5vw, 4px);
+}
+
+.menu-subtitle {
+  font-size: clamp(14px, 2vw, 20px);
+  margin: 0 0 clamp(30px, 5vh, 50px) 0;
+  color: rgba(255, 255, 255, 0.6);
+  letter-spacing: clamp(1px, 0.3vw, 3px);
+  text-transform: uppercase;
+}
+
+.menu-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: clamp(10px, 1.5vh, 15px);
+  margin-bottom: clamp(15px, 3vh, 30px);
+}
+
+.menu-version {
+  margin-top: clamp(20px, 4vh, 40px);
+  font-size: clamp(10px, 1.2vw, 12px);
+  color: rgba(255, 255, 255, 0.3);
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes pulse {
+  0%, 100% {
+    text-shadow: 
+      0 0 10px #00ff00,
+      0 0 20px #00ff00,
+      0 0 30px #00ff00;
+  }
+  50% {
+    text-shadow: 
+      0 0 20px #00ff00,
+      0 0 40px #00ff00,
+      0 0 60px #00ff00;
+  }
+}

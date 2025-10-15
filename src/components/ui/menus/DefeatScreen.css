@@ -1,0 +1,53 @@
+.defeat-screen {
+  text-align: center;
+  color: white;
+  min-width: clamp(250px, 50vw, 450px);
+  padding: clamp(15px, 2vw, 20px);
+}
+
+.defeat-title {
+  font-size: clamp(32px, 6vw, 48px);
+  color: #ff0000;
+  margin: 0 0 clamp(10px, 2vh, 15px) 0;
+  text-shadow: 0 0 clamp(15px, 3vw, 25px) #ff0000;
+  letter-spacing: clamp(2px, 0.5vw, 4px);
+}
+
+.defeat-reason {
+  font-size: clamp(16px, 2.5vw, 20px);
+  color: #ffaa00;
+  margin: 0 0 clamp(20px, 3vh, 30px) 0;
+  font-style: italic;
+}
+
+.defeat-stats {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: clamp(6px, 1vw, 10px);
+  padding: clamp(15px, 2vw, 20px);
+  margin-bottom: clamp(20px, 3vh, 30px);
+  font-size: clamp(14px, 1.8vw, 16px);
+}
+
+.defeat-stats p {
+  margin: clamp(5px, 1vh, 8px) 0;
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.defeat-score {
+  font-size: clamp(18px, 2.5vw, 22px) !important;
+  font-weight: bold;
+  color: #ff6666 !important;
+  margin-top: clamp(10px, 2vh, 15px) !important;
+  padding-top: clamp(10px, 2vh, 15px);
+  border-top: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.defeat-accuracy {
+  color: #ffaa00 !important;
+}
+
+.defeat-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: clamp(10px, 1.5vh, 15px);
+}

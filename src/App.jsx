@@ -6,25 +6,113 @@ import { EffectComposer } from "three/examples/jsm/postprocessing/EffectComposer
 import { RenderPixelatedPass } from "three/examples/jsm/postprocessing/RenderPixelatedPass";
 import { OutputPass } from "three/examples/jsm/postprocessing/OutputPass";
 import { GUI } from "three/addons/libs/lil-gui.module.min.js";
+import { useGameStore } from "./state/stores/gameStore";
+import { useSettingsStore } from "./state/stores/settingsStore";
+import { useAudio } from "./hooks/useAudio";
+import SplashScreen from "./components/SplashScreen";
+import MainMenu from "./components/ui/menus/MainMenu";
+import SettingsMenu from "./components/ui/menus/SettingsMenu";
+import PauseMenu from "./components/ui/menus/PauseMenu";
+import DefeatScreen from "./components/ui/menus/DefeatScreen";
 import "./App.css";
 
 function App() {
   const mountRef = useRef(null);
-  const [velocity, setVelocity] = useState(50);
-  const [angle, setAngle] = useState(45);
-  const [heading, setHeading] = useState(0);
-  const [kills, setKills] = useState(0);
-  const [shots, setShots] = useState(0);
-  const [startTime] = useState(Date.now());
-  const [victory, setVictory] = useState(false);
-  const keysRef = useRef({ w: false, a: false, s: false, d: false });
+  
+  // Game store - weapon configuration
+  const velocity = useGameStore((state) => state.weaponConfig.velocity);
+  const angle = useGameStore((state) => state.weaponConfig.angle);
+  const heading = useGameStore((state) => state.weaponConfig.heading);
+  const setVelocity = useGameStore((state) => state.setVelocity);
+  const setAngle = useGameStore((state) => state.setAngle);
+  const setHeading = useGameStore((state) => state.setHeading);
+  
+  // Game store - game state
+  const kills = useGameStore((state) => state.kills);
+  const shots = useGameStore((state) => state.shots);
+  const fuel = useGameStore((state) => state.fuel);
+  const fuelUsed = useGameStore((state) => state.fuelUsed);
+  const incrementKills = useGameStore((state) => state.incrementKills);
+  const incrementShots = useGameStore((state) => state.incrementShots);
+  const consumeFuel = useGameStore((state) => state.consumeFuel);
+  const canMove = useGameStore((state) => state.canMove);
+  const canShoot = useGameStore((state) => state.canShoot);
+  const isFuelCritical = useGameStore((state) => state.isFuelCritical);
+  const startGame = useGameStore((state) => state.startGame);
+  const resetGame = useGameStore((state) => state.resetGame);
+  const victoryAchieved = useGameStore((state) => state.victoryAchieved);
+  const defeatSuffered = useGameStore((state) => state.defeatSuffered);
+  const gameStatus = useGameStore((state) => state.gameStatus);
+  const getElapsedTime = useGameStore((state) => state.getElapsedTime);
+  const getCurrentScore = useGameStore((state) => state.getCurrentScore);
+  const getAccuracy = useGameStore((state) => state.getAccuracy);
+  
+  // Settings store
+  const pixelSize = useSettingsStore((state) => state.pixelSize);
+  
+  // Initialize audio (handles volume sync automatically)
+  const audio = useAudio();
+  
+  // Local UI state (not in stores)
   const [joystickPos, setJoystickPos] = useState({ x: 0, y: 0 });
   const [joystickActive, setJoystickActive] = useState(false);
+  const [showHelp, setShowHelp] = useState(false);
+  const [showSplash, setShowSplash] = useState(true);
+  const [defeatReason, setDefeatReason] = useState(null);
+  const keysRef = useRef({ w: false, a: false, s: false, d: false });
   const targetsRef = useRef([]);
   const joystickRef = useRef(null);
+  
+  // Computed values
+  const victory = gameStatus === 'victory';
+  const defeat = gameStatus === 'defeat';
+
+  // Handle splash screen completion
+  const handleSplashComplete = () => {
+    setShowSplash(false);
+    // Go to main menu instead of starting game directly
+    useGameStore.getState().setGameStatus('menu');
+    // Play menu music
+    audio.playMusic('menu');
+  };
+
+  // Start game when transitioning from menu to playing
+  useEffect(() => {
+    if (gameStatus === 'playing' && !victory) {
+      startGame();
+      audio.stopMusic();
+      audio.playMusic('game');
+    }
+  }, [gameStatus, victory, startGame, audio]);
+
+  // Clean up music on unmount
+  useEffect(() => {
+    return () => {
+      audio.stopMusic();
+    };
+  }, [audio]);
+
+  // Low fuel warning sound (plays every 3 seconds when critical)
+  useEffect(() => {
+    if (!isFuelCritical()) return;
+    
+    const warningInterval = setInterval(() => {
+      if (isFuelCritical() && gameStatus === 'playing') {
+        audio.playSFX('low-fuel', { volume: 0.2 });
+      }
+    }, 3000);
+    
+    return () => clearInterval(warningInterval);
+  }, [isFuelCritical, gameStatus, audio]);
 
   useEffect(() => {
+    // Only initialize Three.js scene when not on menu screens
+    if (gameStatus === 'menu' || gameStatus === 'settings' || gameStatus === 'splash') {
+      return;
+    }
+    
     const currentMount = mountRef.current;
+    if (!currentMount) return;
 
     // Scene
     const scene = new THREE.Scene();
@@ -73,11 +161,6 @@ function App() {
       roughness: 0,
       metalness: 1
     });
-    const edgesGeometry = new THREE.EdgesGeometry(planetGeometry);
-    const lineMaterial = new THREE.LineBasicMaterial({ color: 0x330000 }); // Red color for edges
-    const sphereEdges = new THREE.LineSegments(edgesGeometry, lineMaterial);
-    scene.add(sphereEdges);
-
     const planet = new THREE.Mesh(planetGeometry, planetMaterial);
     scene.add(planet);
 
@@ -227,6 +310,7 @@ function App() {
     // Projectile
     let projectile = null;
     let projectileVelocity = new THREE.Vector3();
+    let projectileLaunchTime = 0;
 
     // Explosion particles
     const explosionParticles = [];
@@ -363,11 +447,17 @@ function App() {
         scene.remove(projectile);
       }
 
+      // Play launch sound
+      audio.playSFX('launch', { volume: 0.3 });
+
       const projGeometry = new THREE.SphereGeometry(0.5, 8, 8);
       const projMaterial = new THREE.MeshBasicMaterial({ color: 0xff0000 });
       projectile = new THREE.Mesh(projGeometry, projMaterial);
       projectile.position.copy(player.position);
       scene.add(projectile);
+      
+      // Track launch time to prevent immediate suicide
+      projectileLaunchTime = Date.now();
 
       const angleRad = (ang * Math.PI) / 180;
       const headingRad = (head * Math.PI) / 180; // 0° = screen up, 90° = screen right
@@ -419,30 +509,95 @@ function App() {
         keys[key] = true;
       }
       
+      // Determine adjustment amount based on modifier keys
+      const getAdjustment = (normal, fine, coarse) => {
+        if (event.shiftKey) return fine;
+        if (event.ctrlKey || event.metaKey) return coarse;
+        return normal;
+      };
+      
+      // Get current values from store (avoids closure stale state)
+      const getCurrentWeaponConfig = () => useGameStore.getState().weaponConfig;
+      
       // Handle spacebar for shooting
       if (event.key === ' ') {
         event.preventDefault();
-        launchProjectile(mountRef.current?.velocity || 50, mountRef.current?.angle || 45, mountRef.current?.heading || 0);
+        const currentConfig = getCurrentWeaponConfig();
+        if (useGameStore.getState().canShoot()) {
+          launchProjectile(currentConfig.velocity, currentConfig.angle, currentConfig.heading);
+          useGameStore.getState().incrementShots();
+          useGameStore.getState().consumeFuel(5);
+        }
       }
       
       // Handle Q and E for heading adjustment
       if (key === 'q') {
         event.preventDefault();
-        const newHeading = ((mountRef.current?.heading || 0) - 5 + 360) % 360;
-        if (mountRef.current) {
-          mountRef.current.heading = newHeading;
-          mountRef.current.updateIndicator?.(mountRef.current.angle || 45, newHeading);
-        }
-        setHeading(newHeading);
+        const currentConfig = getCurrentWeaponConfig();
+        const adjustment = getAdjustment(5, 1, 15);
+        const newHeading = ((currentConfig.heading - adjustment + 360) % 360);
+        useGameStore.getState().setHeading(newHeading);
+        mountRef.current?.updateIndicator?.(currentConfig.angle, newHeading);
       }
       if (key === 'e') {
         event.preventDefault();
-        const newHeading = ((mountRef.current?.heading || 0) + 5) % 360;
-        if (mountRef.current) {
-          mountRef.current.heading = newHeading;
-          mountRef.current.updateIndicator?.(mountRef.current.angle || 45, newHeading);
+        const currentConfig = getCurrentWeaponConfig();
+        const adjustment = getAdjustment(5, 1, 15);
+        const newHeading = ((currentConfig.heading + adjustment) % 360);
+        useGameStore.getState().setHeading(newHeading);
+        mountRef.current?.updateIndicator?.(currentConfig.angle, newHeading);
+      }
+      
+      // NEW: R and F for angle adjustment
+      if (key === 'r') {
+        event.preventDefault();
+        const currentConfig = getCurrentWeaponConfig();
+        const adjustment = getAdjustment(5, 1, 15);
+        const newAngle = Math.max(0, Math.min(90, currentConfig.angle + adjustment));
+        useGameStore.getState().setAngle(newAngle);
+        mountRef.current?.updateIndicator?.(newAngle, currentConfig.heading);
+      }
+      if (key === 'f') {
+        event.preventDefault();
+        const currentConfig = getCurrentWeaponConfig();
+        const adjustment = getAdjustment(5, 1, 15);
+        const newAngle = Math.max(0, Math.min(90, currentConfig.angle - adjustment));
+        useGameStore.getState().setAngle(newAngle);
+        mountRef.current?.updateIndicator?.(newAngle, currentConfig.heading);
+      }
+      
+      // NEW: T and G for velocity adjustment
+      if (key === 't') {
+        event.preventDefault();
+        const currentConfig = getCurrentWeaponConfig();
+        const adjustment = getAdjustment(5, 1, 10);
+        const newVelocity = Math.max(10, Math.min(100, currentConfig.velocity + adjustment));
+        useGameStore.getState().setVelocity(newVelocity);
+      }
+      if (key === 'g') {
+        event.preventDefault();
+        const currentConfig = getCurrentWeaponConfig();
+        const adjustment = getAdjustment(5, 1, 10);
+        const newVelocity = Math.max(10, Math.min(100, currentConfig.velocity - adjustment));
+        useGameStore.getState().setVelocity(newVelocity);
+      }
+      
+      // NEW: H for help
+      if (key === 'h') {
+        event.preventDefault();
+        audio.playSFX('ui-click', { volume: 0.2 });
+        setShowHelp(prev => !prev);
+      }
+      
+      // ESC for pause
+      if (key === 'escape') {
+        event.preventDefault();
+        const currentStatus = useGameStore.getState().gameStatus;
+        if (currentStatus === 'playing') {
+          useGameStore.getState().setGameStatus('paused');
+        } else if (currentStatus === 'paused') {
+          useGameStore.getState().setGameStatus('playing');
         }
-        setHeading(newHeading);
       }
     };
 
@@ -491,6 +646,16 @@ function App() {
       
       // Apply movement
       if (movement.length() > 0) {
+        // Check if player has fuel to move
+        if (!canMove()) {
+          return; // No fuel, can't move
+        }
+        
+        // Consume fuel based on movement distance
+        const movementDistance = movement.length();
+        const fuelCost = movementDistance * 2; // Adjust multiplier for balance
+        consumeFuel(fuelCost);
+        
         currentPos.add(movement);
         
         // Project back onto sphere surface
@@ -552,6 +717,16 @@ function App() {
       pointLight.position.z = Math.sin(time / 10) * orbitRadius;
       pointLight.position.y = Math.sin((time / 10) * 0.05) * 3; // Vary height as well
 
+      // Check for out of fuel defeat (use getState to avoid closure stale values)
+      const currentFuel = useGameStore.getState().fuel;
+      const currentStatus = useGameStore.getState().gameStatus;
+      if (currentFuel <= 0 && currentStatus === 'playing') {
+        setDefeatReason('outOfFuel');
+        useGameStore.getState().defeatSuffered();
+        audio.stopMusic();
+        audio.playMusic('defeat');
+      }
+
       // Update player position based on key states
       updatePlayerPosition();
 
@@ -589,23 +764,55 @@ function App() {
         projectileVelocity.add(toPlanet);
         projectile.position.add(projectileVelocity);
 
-        // Check collision with targets first
+        // Check collision with player (suicide!) - only after projectile has traveled
+        // Minimum 1 second flight time to prevent instant suicide on vertical shots
+        const timeInFlight = Date.now() - projectileLaunchTime;
+        if (timeInFlight > 1000 && projectile.position.distanceTo(player.position) < 1.5) {
+          audio.playSFX('explosion-large', { volume: 0.4 });
+          createImpactMark(projectile.position, true);
+          scene.remove(projectile);
+          projectile = null;
+          setDefeatReason('suicide');
+          defeatSuffered(); // Game over!
+          audio.stopMusic();
+          audio.playMusic('defeat');
+          return; // Stop checking other collisions
+        }
+
+        // Check collision with targets
         let hitTarget = false;
         const currentTargets = targetsRef.current;
         for (let i = currentTargets.length - 1; i >= 0; i--) {
           if (projectile.position.distanceTo(currentTargets[i].position) < 3) {
             // Hit a target!
-            createImpactMark(projectile.position, true); // Red explosion for hit
+            const impactPosition = projectile.position.clone();
+            
+            audio.playSFX('hit', { volume: 0.3 });
+            audio.playSFX('explosion-large', { volume: 0.4 });
+            createImpactMark(impactPosition, true); // Red explosion for hit
             scene.remove(currentTargets[i]);
             currentTargets.splice(i, 1);
             scene.remove(projectile);
             projectile = null;
             hitTarget = true;
-            setKills(prevKills => prevKills + 1); // Increment kills
+            incrementKills(); // Use store action
             
-            // Check for victory
-            if (currentTargets.length === 0) {
-              setVictory(true);
+            // Check if explosion blast radius kills player
+            const blastRadius = 5; // Explosion danger zone
+            if (impactPosition.distanceTo(player.position) < blastRadius) {
+              setDefeatReason('suicide');
+              defeatSuffered(); // Killed by own explosion!
+              audio.stopMusic();
+              audio.playMusic('defeat');
+              break; // Don't check for victory if player died
+            }
+            
+            // Check for victory (only if player survived)
+            if (currentTargets.length === 0 && gameStatus === 'playing') {
+              victoryAchieved(); // Use store action
+              audio.playSFX('victory', { volume: 0.5 });
+              audio.stopMusic(); // Stop game music
+              audio.playMusic('victory'); // Play victory theme
             }
             break;
           }
@@ -613,9 +820,21 @@ function App() {
 
         // Check collision with planet (only if didn't hit target)
         if (!hitTarget && projectile && projectile.position.length() < 20.5) {
-          createImpactMark(projectile.position, false); // White explosion for miss
+          const impactPosition = projectile.position.clone();
+          
+          audio.playSFX('explosion-small', { volume: 0.3 });
+          createImpactMark(impactPosition, false); // White explosion for miss
           scene.remove(projectile);
           projectile = null;
+          
+          // Check if explosion is close enough to kill player (blast radius)
+          const blastRadius = 5; // Explosion danger zone
+          if (impactPosition.distanceTo(player.position) < blastRadius) {
+            setDefeatReason('suicide');
+            defeatSuffered(); // Killed by own explosion!
+            audio.stopMusic();
+            audio.playMusic('defeat');
+          }
         }
 
         // Remove if too far
@@ -654,12 +873,18 @@ function App() {
 
       currentMount.removeChild(renderer.domElement);
     };
-  }, []);
+  }, [gameStatus]);
 
   const handleLaunch = () => {
+    // Check if player has enough fuel to shoot
+    if (!canShoot()) {
+      return; // Not enough fuel
+    }
+    
     if (mountRef.current && mountRef.current.launchProjectile) {
       mountRef.current.launchProjectile(velocity, angle, heading);
-      setShots(prevShots => prevShots + 1); // Increment shots
+      incrementShots(); // Use store action
+      consumeFuel(5); // Consume fuel for shot
     }
   };
 
@@ -761,16 +986,93 @@ function App() {
       const newTargets = mountRef.current.createTargets();
       targetsRef.current = newTargets;
       
-      // Reset game state
-      setKills(0);
-      setShots(0);
-      setVictory(false);
+      // Reset game state using store
+      resetGame();
+      startGame(); // Restart timer
+      
+      // Return to playing state
+      useGameStore.getState().setGameStatus('playing');
+      
+      // Restart music
+      audio.playMusic('game');
     }
   };
 
+  // Render appropriate screen based on game status
+  if (showSplash) {
+    return <SplashScreen onStart={handleSplashComplete} />;
+  }
+
+  if (gameStatus === 'menu') {
+    return <MainMenu />;
+  }
+
+  if (gameStatus === 'settings') {
+    return <SettingsMenu />;
+  }
+
+  if (gameStatus === 'defeat') {
+    return <DefeatScreen reason={defeatReason} />;
+  }
+
   return (
     <div>
+      {/* Show pause menu if paused */}
+      {gameStatus === 'paused' && <PauseMenu />}
+      
       <div ref={mountRef} style={{ width: "100%", height: "100vh" }} />
+      
+      {/* Fuel gauge - top left */}
+      <div
+        style={{
+          position: "absolute",
+          top: "0px",
+          left: "0px",
+          background: "rgba(0,0,0,0.5)",
+          color: isFuelCritical() ? "#ff3333" : "white",
+          padding: "10px",
+          fontSize: "18px",
+          fontWeight: "bold",
+          minWidth: "120px",
+        }}
+      >
+        <div style={{ marginBottom: "5px" }}>
+          Fuel: {Math.floor(fuel)}%
+        </div>
+        <div
+          style={{
+            width: "100px",
+            height: "12px",
+            background: "rgba(255,255,255,0.2)",
+            borderRadius: "6px",
+            overflow: "hidden",
+            border: "1px solid rgba(255,255,255,0.4)",
+          }}
+        >
+          <div
+            style={{
+              width: `${fuel}%`,
+              height: "100%",
+              background: isFuelCritical()
+                ? "linear-gradient(90deg, #ff0000, #ff6666)"
+                : fuel < 50
+                ? "linear-gradient(90deg, #ffaa00, #ffdd00)"
+                : "linear-gradient(90deg, #00ff00, #44ff44)",
+              transition: "width 0.3s, background 0.5s",
+              boxShadow: isFuelCritical() ? "0 0 10px #ff0000" : "none",
+            }}
+          />
+        </div>
+        {isFuelCritical() && (
+          <div style={{
+            color: "#ff3333",
+            fontSize: "12px",
+            marginTop: "3px"
+          }}>
+            ⚠️ LOW FUEL!
+          </div>
+        )}
+      </div>
       
       {/* Score display - top right */}
       <div
@@ -781,11 +1083,16 @@ function App() {
           background: "rgba(0,0,0,0.5)",
           color: "white",
           padding: "10px",
-          fontSize: "24px",
+          fontSize: "20px",
           fontWeight: "bold",
         }}
       >
-        Score: {kills * 100}
+        <div style={{ fontSize: "24px", marginBottom: "5px" }}>
+          Score: {Math.floor(getCurrentScore())}
+        </div>
+        <div style={{ fontSize: "14px", opacity: 0.8 }}>
+          Kills: {kills} | Acc: {getAccuracy().toFixed(1)}%
+        </div>
       </div>
       
       {/* Launch controls - bottom right, 60% width */}
@@ -864,11 +1171,17 @@ function App() {
           <p style={{ fontSize: "20px", margin: "0 0 10px 0" }}>
             Shots: {shots} × -30 = {shots * -30}
           </p>
-          <p style={{ fontSize: "20px", margin: "0 0 20px 0" }}>
-            Time: {Math.floor((Date.now() - startTime) / 1000)}s × -1 = -{Math.floor((Date.now() - startTime) / 1000)}
+          <p style={{ fontSize: "20px", margin: "0 0 10px 0" }}>
+            Fuel Used: {Math.floor(fuelUsed)} × -0.5 = {Math.floor(fuelUsed * -0.5)}
           </p>
-          <p style={{ fontSize: "28px", margin: "0 0 30px 0", fontWeight: "bold", borderTop: "2px solid white", paddingTop: "10px" }}>
-            Final Score: {kills * 100 - shots * 30 - Math.floor((Date.now() - startTime) / 1000)}
+          <p style={{ fontSize: "20px", margin: "0 0 20px 0" }}>
+            Time: {getElapsedTime()}s × -1 = -{getElapsedTime()}
+          </p>
+          <p style={{ fontSize: "28px", margin: "0 0 10px 0", fontWeight: "bold", borderTop: "2px solid white", paddingTop: "10px" }}>
+            Final Score: {getCurrentScore()}
+          </p>
+          <p style={{ fontSize: "18px", margin: "0 0 30px 0", color: "#44ff44" }}>
+            Accuracy: {getAccuracy().toFixed(1)}%
           </p>
           <button
             onClick={handlePlayAgain}
@@ -982,6 +1295,58 @@ function App() {
           }}
         />
       </div>
+      
+      {/* Help Overlay */}
+      {showHelp && (
+        <div
+          style={{
+            position: "absolute",
+            top: "50%",
+            left: "50%",
+            transform: "translate(-50%, -50%)",
+            background: "rgba(0,0,0,0.95)",
+            color: "white",
+            padding: "30px",
+            borderRadius: "10px",
+            border: "2px solid white",
+            zIndex: 999,
+            maxWidth: "400px",
+          }}
+        >
+          <h2 style={{ margin: "0 0 20px 0", textAlign: "center" }}>CONTROLS</h2>
+          <div style={{ fontSize: "16px", lineHeight: "1.8" }}>
+            <p><strong>Movement:</strong> WASD</p>
+            <p><strong>Fire:</strong> Space</p>
+            <p><strong>Heading:</strong> Q / E</p>
+            <p><strong>Angle:</strong> R / F</p>
+            <p><strong>Velocity:</strong> T / G</p>
+            <p style={{ fontSize: "14px", opacity: 0.7, marginTop: "15px" }}>
+              💡 Hold <strong>Shift</strong> for fine control<br />
+              💡 Hold <strong>Ctrl</strong> for coarse control
+            </p>
+            <p style={{ fontSize: "14px", opacity: 0.7, marginTop: "10px" }}>
+              Press <strong>H</strong> to toggle this help
+            </p>
+          </div>
+          <button
+            onClick={() => setShowHelp(false)}
+            style={{
+              width: "100%",
+              padding: "10px",
+              marginTop: "20px",
+              background: "white",
+              color: "black",
+              border: "none",
+              borderRadius: "5px",
+              cursor: "pointer",
+              fontWeight: "bold",
+              fontSize: "16px",
+            }}
+          >
+            CLOSE
+          </button>
+        </div>
+      )}
     </div>
   );
 }

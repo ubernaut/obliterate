@@ -1,0 +1,95 @@
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(0, 0, 0, 0.85);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+  backdrop-filter: blur(5px);
+  animation: fadeIn 0.2s ease;
+  pointer-events: all;
+}
+
+.modal-content {
+  background: linear-gradient(135deg, rgba(0, 0, 0, 0.95), rgba(20, 20, 20, 0.95));
+  border: clamp(2px, 0.3vw, 3px) solid rgba(255, 255, 255, 0.3);
+  border-radius: clamp(10px, 1.5vw, 15px);
+  padding: clamp(20px, 3vw, 30px);
+  max-width: 90vw;
+  width: clamp(300px, 60vw, 600px);
+  max-height: 85vh;
+  overflow-y: auto;
+  position: relative;
+  box-shadow:
+    0 clamp(10px, 2vh, 20px) clamp(30px, 6vh, 60px) rgba(0, 0, 0, 0.8),
+    inset 0 0 clamp(10px, 2vw, 20px) rgba(255, 255, 255, 0.05);
+  animation: slideIn 0.3s ease;
+  pointer-events: all;
+  z-index: 10001;
+}
+
+.modal-close {
+  position: absolute;
+  top: clamp(10px, 1.5vh, 15px);
+  right: clamp(10px, 1.5vh, 15px);
+  background: transparent;
+  border: none;
+  color: white;
+  font-size: clamp(20px, 3vw, 28px);
+  cursor: pointer;
+  width: clamp(28px, 4vw, 36px);
+  height: clamp(28px, 4vw, 36px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  transition: all 0.2s;
+}
+
+.modal-close:hover {
+  background: rgba(255, 255, 255, 0.1);
+  transform: rotate(90deg);
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-30px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* Scrollbar styling */
+.modal-content::-webkit-scrollbar {
+  width: 8px;
+}
+
+.modal-content::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+}
+
+.modal-content::-webkit-scrollbar-thumb {
+  background: rgba(0, 255, 0, 0.5);
+  border-radius: 4px;
+}
+
+.modal-content::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 255, 0, 0.7);
+}

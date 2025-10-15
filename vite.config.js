@@ -8,4 +8,13 @@ export default defineConfig({
   build: {
     outDir: "docs",
   },
+  test: {
+    globals: true,
+    environment: "happy-dom",
+    setupFiles: "./tests/setup.js",
+    coverage: {
+      provider: "v8",
+      reporter: ["text", "html"],
+    },
+  },
 });

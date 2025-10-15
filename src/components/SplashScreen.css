@@ -1,0 +1,112 @@
+.splash-screen {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: linear-gradient(135deg, #000000 0%, #1a1a1a 50%, #000000 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+  animation: fadeIn 0.5s ease;
+}
+
+.splash-content {
+  text-align: center;
+  color: white;
+  padding: clamp(20px, 4vw, 40px);
+  max-width: 90vw;
+}
+
+.game-title {
+  font-size: clamp(32px, 8vw, 72px);
+  font-weight: bold;
+  margin: 0 0 clamp(5px, 1vh, 10px) 0;
+  color: #00ff00;
+  text-shadow:
+    0 0 10px #00ff00,
+    0 0 20px #00ff00,
+    0 0 30px #00ff00,
+    0 0 40px #00ff00;
+  animation: pulse 2s ease-in-out infinite;
+}
+
+.game-subtitle {
+  font-size: clamp(14px, 2.5vw, 24px);
+  margin: 0 0 clamp(30px, 5vh, 60px) 0;
+  color: rgba(255, 255, 255, 0.7);
+  letter-spacing: clamp(1px, 0.3vw, 3px);
+}
+
+.start-button {
+  font-size: clamp(18px, 3vw, 28px);
+  padding: clamp(12px, 2vh, 20px) clamp(30px, 6vw, 60px);
+  background: linear-gradient(135deg, #00ff00, #00cc00);
+  color: black;
+  border: clamp(2px, 0.3vw, 3px) solid white;
+  border-radius: clamp(6px, 1vw, 10px);
+  cursor: pointer;
+  font-weight: bold;
+  letter-spacing: clamp(1px, 0.2vw, 2px);
+  box-shadow: 0 clamp(5px, 1vh, 10px) clamp(10px, 2vh, 20px) rgba(0, 0, 0, 0.5);
+  transition: all 0.3s ease;
+}
+
+.start-button:hover:not(:disabled) {
+  transform: translateY(-5px) scale(1.05);
+  box-shadow: 0 15px 30px rgba(0, 0, 0, 0.6);
+  background: linear-gradient(135deg, #00ff44, #00dd00);
+}
+
+.start-button:active:not(:disabled) {
+  transform: translateY(-2px) scale(1.02);
+}
+
+.start-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  animation: spin 1s linear infinite;
+}
+
+.splash-info {
+  margin-top: clamp(25px, 5vh, 50px);
+  font-size: clamp(12px, 1.5vw, 14px);
+  color: rgba(255, 255, 255, 0.5);
+  line-height: 1.8;
+}
+
+.splash-info p {
+  margin: clamp(3px, 0.5vh, 5px) 0;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes pulse {
+  0%, 100% {
+    text-shadow: 
+      0 0 10px #00ff00,
+      0 0 20px #00ff00,
+      0 0 30px #00ff00;
+  }
+  50% {
+    text-shadow: 
+      0 0 20px #00ff00,
+      0 0 40px #00ff00,
+      0 0 60px #00ff00,
+      0 0 80px #00ff00;
+  }
+}
+
+@keyframes spin {
+  0% { opacity: 0.6; }
+  50% { opacity: 0.8; }
+  100% { opacity: 0.6; }
+}

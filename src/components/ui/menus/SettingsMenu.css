@@ -1,0 +1,106 @@
+.settings-menu {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: linear-gradient(135deg, #000000 0%, #0a0a0a 50%, #000000 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  animation: fadeIn 0.3s ease;
+}
+
+.settings-content {
+  background: rgba(0, 0, 0, 0.9);
+  border: clamp(2px, 0.3vw, 3px) solid rgba(0, 255, 0, 0.3);
+  border-radius: clamp(10px, 1.5vw, 15px);
+  padding: clamp(20px, 4vw, 40px);
+  max-width: 90vw;
+  width: clamp(300px, 60vw, 600px);
+  max-height: 85vh;
+  overflow-y: auto;
+  box-shadow: 0 clamp(10px, 2vh, 20px) clamp(30px, 6vh, 60px) rgba(0, 0, 0, 0.8);
+}
+
+.settings-title {
+  font-size: clamp(28px, 5vw, 48px);
+  color: #00ff00;
+  text-align: center;
+  margin: 0 0 clamp(15px, 3vh, 30px) 0;
+  text-shadow: 0 0 clamp(10px, 2vw, 20px) #00ff00;
+  letter-spacing: clamp(1px, 0.3vw, 3px);
+}
+
+.settings-section {
+  margin-bottom: clamp(15px, 3vh, 30px);
+  padding-bottom: clamp(10px, 2vh, 20px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.settings-section:last-of-type {
+  border-bottom: none;
+}
+
+.settings-section h3 {
+  color: white;
+  font-size: clamp(16px, 2vw, 20px);
+  margin: 0 0 clamp(10px, 2vh, 20px) 0;
+  letter-spacing: clamp(0.5px, 0.1vw, 1px);
+  text-transform: uppercase;
+}
+
+.toggle-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: clamp(10px, 1.5vh, 15px) 0;
+  color: white;
+  font-size: clamp(12px, 1.5vw, 14px);
+  font-weight: bold;
+}
+
+.toggle-button {
+  padding: clamp(6px, 1vh, 8px) clamp(15px, 2vw, 20px);
+  background: rgba(255, 255, 255, 0.1);
+  border: clamp(1px, 0.2vw, 2px) solid rgba(255, 255, 255, 0.3);
+  border-radius: clamp(4px, 0.6vw, 6px);
+  color: white;
+  cursor: pointer;
+  font-weight: bold;
+  font-size: clamp(12px, 1.4vw, 14px);
+  transition: all 0.2s;
+  min-width: clamp(50px, 6vw, 60px);
+}
+
+.toggle-button.active {
+  background: #00ff00;
+  border-color: #00ff00;
+  color: black;
+  box-shadow: 0 0 10px #00ff00;
+}
+
+.toggle-button:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.toggle-button.active:hover {
+  background: #00dd00;
+}
+
+.settings-actions {
+  margin-top: clamp(15px, 3vh, 30px);
+  display: flex;
+  gap: clamp(10px, 1.5vh, 15px);
+  flex-direction: column;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}

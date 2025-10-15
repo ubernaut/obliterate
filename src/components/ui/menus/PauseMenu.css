@@ -1,0 +1,27 @@
+.pause-menu {
+  text-align: center;
+  color: white;
+  min-width: clamp(250px, 40vw, 400px);
+  padding: clamp(15px, 2vw, 20px);
+}
+
+.pause-title {
+  font-size: clamp(28px, 5vw, 42px);
+  color: #ffff00;
+  margin: 0 0 clamp(20px, 4vh, 40px) 0;
+  text-shadow: 0 0 clamp(10px, 2vw, 20px) #ffff00;
+  letter-spacing: clamp(2px, 0.5vw, 4px);
+}
+
+.pause-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: clamp(10px, 1.5vh, 15px);
+  margin-bottom: clamp(15px, 3vh, 30px);
+}
+
+.pause-hint {
+  font-size: clamp(12px, 1.5vw, 14px);
+  color: rgba(255, 255, 255, 0.5);
+  margin-top: clamp(10px, 2vh, 20px);
+}
